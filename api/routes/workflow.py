@@ -10,7 +10,7 @@ from httpx import HTTPStatusError, RequestError
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError
 
-from api.constants import DEPLOYMENT_MODE
+from api.constants import DEPLOYMENT_MODE, DOGRAH_DISABLE_MPS
 from api.db import db_client
 from api.db.agent_trigger_client import TriggerPathConflictError
 from api.db.models import UserModel
@@ -576,6 +576,16 @@ async def create_workflow_from_template(
     Raises:
         HTTPException: If MPS API call fails
     """
+    if DOGRAH_DISABLE_MPS:
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "AI workflow generation is unavailable because this deployment runs "
+                "with DOGRAH_DISABLE_MPS=true. POST a workflow definition to "
+                "/api/v1/workflow/create/definition instead."
+            ),
+        )
+
     try:
         # Call MPS API to generate workflow using the client
         if DEPLOYMENT_MODE == "oss":

@@ -11,7 +11,7 @@ import httpx
 from fastapi import HTTPException
 from loguru import logger
 
-from api.constants import DEPLOYMENT_MODE
+from api.constants import DEPLOYMENT_MODE, DOGRAH_DISABLE_MPS
 from api.db import db_client
 from api.db.models import UserModel
 from api.errors.failure import (
@@ -647,6 +647,9 @@ async def authorize_workflow_run_start(
             error_code="workflow_not_found",
             error_message="Workflow not found",
         )
+
+    if DOGRAH_DISABLE_MPS:
+        return QuotaCheckResult(has_quota=True)
 
     try:
         workflow = await db_client.get_workflow(

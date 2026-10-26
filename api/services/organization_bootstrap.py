@@ -17,13 +17,14 @@ from datetime import timedelta
 
 from loguru import logger
 
-from api.constants import AUTH_PROVIDER, DEPLOYMENT_MODE
+from api.constants import AUTH_PROVIDER, DEPLOYMENT_MODE, DOGRAH_DISABLE_MPS
 from api.db import db_client
 from api.db.organization_configuration_client import LEASE_COMPLETED
 from api.enums import OrganizationConfigurationKey
 from api.errors.mps import MPSUnavailableError
 from api.services.configuration.model_connections import (
     dograh_model_configuration_spec,
+    empty_model_configuration_spec,
 )
 from api.services.mps_billing import ensure_hosted_mps_billing_account_v2
 from api.services.mps_service_key_client import mps_service_key_client
@@ -147,6 +148,16 @@ async def _bootstrap_organization(
     lease may be marked terminal.
     """
     if not has_model_configuration:
+        if DOGRAH_DISABLE_MPS:
+            await db_client.bootstrap_default_model_configuration(
+                organization_id,
+                connection_name=MANAGED_CONNECTION_NAME,
+                provider="openai",
+                credentials={},
+                configuration_name=DEFAULT_CONFIGURATION_NAME,
+                configuration_for=lambda _uuid: empty_model_configuration_spec(),
+            )
+            return True
         # Billing is best effort: it is recoverable out of band, and failing the
         # whole bootstrap over it would also cost the org its model config.
         try:

@@ -75,6 +75,7 @@ STACK_AUTH_PROJECT_ID = os.getenv("STACK_AUTH_PROJECT_ID")
 STACK_PUBLISHABLE_CLIENT_KEY = os.getenv("STACK_PUBLISHABLE_CLIENT_KEY")
 DOGRAH_MPS_SECRET_KEY = os.getenv("DOGRAH_MPS_SECRET_KEY", None)
 MPS_API_URL = os.getenv("MPS_API_URL", "https://services.dograh.com")
+DOGRAH_DISABLE_MPS = os.getenv("DOGRAH_DISABLE_MPS", "false").lower() == "true"
 DOGRAH_DEPLOYMENT_ID = os.getenv(
     "DOGRAH_DEPLOYMENT_ID", "oss" if DEPLOYMENT_MODE == "oss" else "us"
 )

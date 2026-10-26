@@ -1,6 +1,7 @@
 """One call-owned policy for response progress, user idleness and call duration."""
 
 import asyncio
+import os
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -65,13 +66,17 @@ class CallMonitorProcessor(FrameProcessor):
         on_response_timeout: Callable[[FrameProcessor], None],
         on_user_idle: Callable[[int], Awaitable[None]],
         conversation_enabled: Callable[[], bool],
-        response_timeout: float = 35,
+        response_timeout: float | None = None,
         tool_timeout: float = 180,
         max_call_duration_seconds: int = DEFAULT_MAX_CALL_DURATION_SECONDS,
         max_duration_end_task_callback: Callable[[], Awaitable[None]] | None = None,
     ):
         super().__init__()
-        self.response_timeout = response_timeout
+        self.response_timeout = (
+            float(response_timeout)
+            if response_timeout is not None
+            else float(os.environ.get("DOGRAH_RESPONSE_TIMEOUT_SECONDS", "35"))
+        )
         self.tool_timeout = tool_timeout
         self.user_idle_timeout = 0.0
         self._response_source = response_source

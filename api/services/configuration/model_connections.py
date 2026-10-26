@@ -262,6 +262,18 @@ def dograh_model_configuration_spec(connection_uuid) -> dict:
     }
 
 
+def empty_model_configuration_spec() -> dict:
+    """Pipeline specification with no provider connections bound."""
+    return {
+        "version": 3,
+        "mode": "pipeline",
+        **{
+            role: {"provider_connection_uuid": None, "settings": {}}
+            for role in ("llm", "stt", "tts", "embeddings")
+        },
+    }
+
+
 async def get_default_model_configuration(organization_id):
     row = await db_client.get_configuration(organization_id, DEFAULT_KEY)
     if row is None or not row.value:

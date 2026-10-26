@@ -10,7 +10,7 @@ from typing import Any
 
 from loguru import logger
 
-from api.constants import DEPLOYMENT_MODE
+from api.constants import DEPLOYMENT_MODE, DOGRAH_DISABLE_MPS
 from api.db import db_client
 from api.enums import WorkflowRunMode
 from api.services.managed_model_services import get_mps_correlation_id
@@ -77,6 +77,9 @@ async def report_workflow_run_platform_usage(workflow_run) -> None:
             "Skipping platform usage report for workflow run {}: no billable duration",
             workflow_run.id,
         )
+        return
+
+    if DOGRAH_DISABLE_MPS:
         return
 
     try:

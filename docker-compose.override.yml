@@ -1,0 +1,26 @@
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:5432:5432"
+  redis:
+    ports: !override
+      - "127.0.0.1:6379:6379"
+  minio:
+    ports: !override
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+  api:
+    image: middleman1337/dograh-api:middleman
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      DOGRAH_DISABLE_MPS: "${DOGRAH_DISABLE_MPS:-false}"
+      DOGRAH_RESPONSE_TIMEOUT_SECONDS: "${DOGRAH_RESPONSE_TIMEOUT_SECONDS:-35}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports: !override
+      - "127.0.0.1:8000:8000"
+  ui:
+    ports: !override
+      - "127.0.0.1:3010:3010"

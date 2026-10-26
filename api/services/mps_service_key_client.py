@@ -16,6 +16,7 @@ from loguru import logger
 from api.constants import (
     DEPLOYMENT_MODE,
     DOGRAH_DEPLOYMENT_ID,
+    DOGRAH_DISABLE_MPS,
     DOGRAH_MPS_SECRET_KEY,
     MPS_API_URL,
 )
@@ -52,7 +53,9 @@ class MPSServiceKeyClient:
     """HTTP client for managing service keys via MPS API."""
 
     def __init__(self):
-        self.base_url = MPS_API_URL
+        self.base_url = (
+            "disabled://dograh-mps" if DOGRAH_DISABLE_MPS else MPS_API_URL
+        )
         self.timeout = httpx.Timeout(10.0)
         # organization id -> Stack team id. Provider ids never change, so the
         # lookup is cached for the life of the process.
