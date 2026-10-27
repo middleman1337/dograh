@@ -841,15 +841,30 @@ def create_stt_service(
     elif user_config.stt.provider == ServiceProviders.ELEVENLABS.value:
         _validate_runtime_service_url(user_config.stt.base_url, "base_url")
         elevenlabs_host = _elevenlabs_realtime_stt_host(user_config.stt.base_url)
+        elevenlabs_model = user_config.stt.model or ""
 
-        return ElevenLabsRealtimeSTTService(
+        if elevenlabs_model.endswith("_realtime"):
+            return ElevenLabsRealtimeSTTService(
+                api_key=user_config.stt.api_key,
+                base_url=elevenlabs_host,
+                commit_strategy=CommitStrategy.VAD,
+                settings=ElevenLabsRealtimeSTTSettings(
+                    model=user_config.stt.model,
+                    **configurable_settings,
+                ),
+                should_interrupt=False,
+                sample_rate=audio_config.transport_in_sample_rate,
+            )
+
+        # The file endpoint works on every plan and detects the language by
+        # itself, so it is the default for accounts without realtime access.
+        from api.services.pipecat.elevenlabs_batch_stt import ElevenLabsBatchSTTService
+
+        return ElevenLabsBatchSTTService(
             api_key=user_config.stt.api_key,
-            base_url=elevenlabs_host,
-            commit_strategy=CommitStrategy.VAD,
-            settings=ElevenLabsRealtimeSTTSettings(
-                model=user_config.stt.model,
-                **configurable_settings,
-            ),
+            base_url=user_config.stt.base_url,
+            model=elevenlabs_model or "scribe_v2",
+            language=configurable_settings.get("language"),
             should_interrupt=False,
             sample_rate=audio_config.transport_in_sample_rate,
         )

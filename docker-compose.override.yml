@@ -19,6 +19,8 @@ services:
       DOGRAH_RESPONSE_TIMEOUT_SECONDS: "${DOGRAH_RESPONSE_TIMEOUT_SECONDS:-35}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - "/home/loungestack/call/secrets:/secrets:ro"
     ports: !override
       - "127.0.0.1:8000:8000"
   ui:
