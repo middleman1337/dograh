@@ -20,6 +20,7 @@ services:
       SUPERVISOR_ESCALATION_URL: "${SUPERVISOR_ESCALATION_URL:-http://cockpit:8000/decision}"
       SUPERVISOR_LIVE_URL: "${SUPERVISOR_LIVE_URL:-http://cockpit:8000/live/event}"
       SUPERVISOR_ESCALATION_DELAY_SECONDS: "${SUPERVISOR_ESCALATION_DELAY_SECONDS:-8}"
+      TWILIO_API_BASE: "${TWILIO_API_BASE:-https://api.twilio.com/2010-04-01}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
