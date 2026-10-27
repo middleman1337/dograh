@@ -35,6 +35,7 @@ from api.services.configuration.masking import (
     merge_workflow_api_keys,
 )
 from api.services.mps_service_key_client import mps_service_key_client
+from api.services.pipecat.live_calls import get_live_call
 from api.services.posthog_tenant import capture_tenant_event
 from api.services.reports import generate_workflow_report_csv
 from api.services.storage import storage_fs
@@ -1512,6 +1513,47 @@ async def get_workflow_run(
         "logs": run.logs,
         "annotations": run.annotations,
     }
+
+
+class SpeakToRunRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+    mute_user: bool = True
+
+
+@router.post("/{workflow_id}/runs/{run_id}/speak")
+async def speak_to_workflow_run(
+    workflow_id: int,
+    run_id: int,
+    request: SpeakToRunRequest,
+    user: UserModel = Depends(get_user),
+):
+    """Queue supervisor speech into a call that is still running.
+
+    The supervisor console uses this to put words in the agent's mouth while
+    the caller is on the line: the text is synthesized by the call's own voice
+    engine and played to the caller.
+    """
+    run = await db_client.get_workflow_run(
+        run_id, organization_id=user.selected_organization_id
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    if run.workflow_id != workflow_id:
+        raise HTTPException(status_code=400, detail="workflow_run_workflow_mismatch")
+
+    live_call = get_live_call(run_id)
+    if live_call is None:
+        raise HTTPException(status_code=409, detail="call is not live")
+
+    try:
+        result = await live_call.say(
+            request.text.strip(), mute_user=request.mute_user
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Supervisor speech failed for run {}: {}", run_id, exc)
+        raise HTTPException(status_code=502, detail=f"speech failed: {exc}") from exc
+
+    return {"status": "queued", "workflow_run_id": run_id, **result}
 
 
 class WorkflowRunsResponse(BaseModel):

@@ -44,6 +44,11 @@ from api.services.pipecat.event_handlers import (
     register_event_handlers,
 )
 from api.services.pipecat.in_memory_buffers import InMemoryLogsBuffer
+from api.services.pipecat.live_calls import (
+    register_live_call,
+    unregister_live_call,
+)
+from api.services.pipecat.live_events import close_forwarder, live_event_forwarder
 from api.services.pipecat.pipeline_builder import (
     build_pipeline,
     build_realtime_pipeline,
@@ -80,6 +85,9 @@ from api.services.pipecat.tracing_config import (
 )
 from api.services.pipecat.transcript_log_coordinator import TranscriptLogCoordinator
 from api.services.pipecat.transport_setup import create_webrtc_transport
+from api.services.pipecat.supervisor_escalation import (
+    escalation_observer as escalation_observer_factory,
+)
 from api.services.pipecat.worker_runner import (
     create_worker_runner,
     run_worker_runner,
@@ -615,6 +623,8 @@ async def _run_pipeline(
             organization_id=organization_id,
         )
     finally:
+        unregister_live_call(workflow_run_id)
+        await close_forwarder(workflow_run_id)
         try:
             await call_concurrency.unregister_active_call(workflow_run_id)
         finally:
@@ -1169,6 +1179,13 @@ async def _run_pipeline_impl(
     engine.call_worker = task
     engine.set_transport_output(transport.output())
 
+    # A supervisor console can make this call say something on demand.
+    register_live_call(
+        workflow_run_id,
+        workflow_id,
+        engine.queue_speech,
+    )
+
     from api.services.observability.call_events.runtime import create_session
 
     call_events_session = await create_session(
@@ -1182,6 +1199,14 @@ async def _run_pipeline_impl(
             task, user_context_aggregator, call_monitor_processor
         )
 
+    # The supervisor service follows the call in real time, not just the
+    # browser that happens to be attached.
+    live_forwarder = live_event_forwarder(
+        workflow_run_id=workflow_run_id,
+        workflow_id=workflow_id,
+        call_context=merged_call_context_vars,
+    )
+
     # Share frame-ID deduplication across the call and all agent workers.
     feedback_observer = RealtimeFeedbackObserver(
         ws_sender=ws_sender,
@@ -1190,8 +1215,19 @@ async def _run_pipeline_impl(
         call_event_recorder=(
             call_events_session.recorder if call_events_session else None
         ),
+        live_forwarder=live_forwarder,
     )
     task.add_observer(feedback_observer)
+
+    # Safety net: if the caller asks for a person and the model never calls
+    # the supervisor-decision tool, this observer raises the card itself.
+    escalation_observer = escalation_observer_factory(
+        run_id=workflow_run_id,
+        call_context=merged_call_context_vars,
+    )
+    if escalation_observer is not None:
+        task.add_observer(escalation_observer)
+
     engine.greeting.log_speech = feedback_observer.log_greeting
     engine.greeting.log_background_speech = (
         feedback_observer.log_background_greeting_speech

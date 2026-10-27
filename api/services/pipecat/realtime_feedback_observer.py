@@ -21,7 +21,7 @@ node changes.
 """
 
 import json
-from typing import TYPE_CHECKING, Awaitable, Callable, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional
 
 from loguru import logger
 
@@ -100,6 +100,7 @@ class RealtimeFeedbackObserver(BaseObserver):
         logs_buffer: Optional["InMemoryLogsBuffer"] = None,
         selected_visit: Callable[[], str | None] | None = None,
         call_event_recorder: "CallEventRecorder | None" = None,
+        live_forwarder: Optional[Any] = None,
     ):
         """
         Args:
@@ -113,6 +114,7 @@ class RealtimeFeedbackObserver(BaseObserver):
         self._logs_buffer = logs_buffer
         self._selected_visit = selected_visit
         self._call_event_recorder = call_event_recorder
+        self._live_forwarder = live_forwarder
         self._frames_seen: set[int] = set()
 
     async def log_speech(self, text: str):
@@ -398,20 +400,23 @@ class RealtimeFeedbackObserver(BaseObserver):
             )
 
     async def _send_ws(self, message: dict):
-        """Send message via WebSocket only, handling errors gracefully."""
-        if not self._ws_sender:
-            return
-        try:
-            # Inject current node info from the logs buffer
-            if self._logs_buffer and self._logs_buffer.current_node_id:
-                message = {
-                    **message,
-                    "node_id": self._logs_buffer.current_node_id,
-                    "node_name": self._logs_buffer.current_node_name,
-                }
-            await self._ws_sender(message)
-        except Exception as e:
-            logger.debug(f"Failed to send real-time feedback message: {e}")
+        """Send message via WebSocket and the supervisor service."""
+        if self._logs_buffer and self._logs_buffer.current_node_id:
+            message = {
+                **message,
+                "node_id": self._logs_buffer.current_node_id,
+                "node_name": self._logs_buffer.current_node_name,
+            }
+        if self._ws_sender:
+            try:
+                await self._ws_sender(message)
+            except Exception as e:
+                logger.debug(f"Failed to send real-time feedback message: {e}")
+        if self._live_forwarder is not None:
+            try:
+                await self._live_forwarder.send(message)
+            except Exception as e:
+                logger.debug(f"Failed to forward live event: {e}")
 
     async def _send_message(self, message: dict):
         """Send message via WebSocket AND append to logs buffer."""
