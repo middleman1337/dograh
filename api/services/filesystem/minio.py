@@ -59,27 +59,24 @@ class MinioFileSystem(BaseFileSystem):
             if not self.client.bucket_exists(self.bucket_name):
                 self.client.make_bucket(self.bucket_name)
 
-            # Set public read/write policy for local development
-            # This allows:
-            # 1. Anonymous downloads (s3:GetObject)
-            # 2. Anonymous uploads (s3:PutObject) - bypasses presigned URL signature issues
-            # 3. List bucket contents (s3:ListBucket) for debugging
-            # Note: This is set on every initialization to ensure policy is correct
-            # WARNING: Only use in local development, not production!
+            # Hardened anonymous access:
+            # 1. Anonymous downloads (s3:GetObject) only for recordings, campaigns, knowledge_base
+            # 2. Anonymous uploads (s3:PutObject) for browser direct uploads
+            # 3. NO s3:ListBucket (prevents bucket enumeration and data harvesting)
+            # 4. NO access to transcripts/* (transcripts must go through authenticated API)
+            # 5. NO s3:DeleteObject
             policy = {
                 "Version": "2012-10-17",
                 "Statement": [
                     {
                         "Effect": "Allow",
                         "Principal": {"AWS": "*"},
-                        "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-                        "Resource": [f"arn:aws:s3:::{self.bucket_name}/*"],
-                    },
-                    {
-                        "Effect": "Allow",
-                        "Principal": {"AWS": "*"},
-                        "Action": ["s3:ListBucket"],
-                        "Resource": [f"arn:aws:s3:::{self.bucket_name}"],
+                        "Action": ["s3:GetObject", "s3:PutObject"],
+                        "Resource": [
+                            f"arn:aws:s3:::{self.bucket_name}/recordings/*",
+                            f"arn:aws:s3:::{self.bucket_name}/campaigns/*",
+                            f"arn:aws:s3:::{self.bucket_name}/knowledge_base/*",
+                        ],
                     },
                 ],
             }
